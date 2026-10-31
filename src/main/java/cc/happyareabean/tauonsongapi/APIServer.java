@@ -40,6 +40,9 @@ public class APIServer {
         APP_URL = System.getenv("APP_URL");
         STATIC_FILES_PATH = System.getenv("STATIC_FILES_PATH");
 
+        var portEnv = System.getenv("APP_PORT");
+        int APP_PORT = portEnv == null ? 7000 : Integer.parseInt(portEnv);
+
         var apiServer = new APIServer();
 
         Javalin app = Javalin.create(config -> {
@@ -55,7 +58,7 @@ public class APIServer {
             config.routes.get("/get/{type}/{dataType}", apiServer::handleDownload);
 
             config.routes.get("/static/{fileName}", apiServer::handleStaticFileProxy);
-        }).start(7000);
+        }).start(APP_PORT);
     }
 
     private void handleStaticFileProxy(Context ctx) throws IOException {
