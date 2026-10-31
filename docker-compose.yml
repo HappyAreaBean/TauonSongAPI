@@ -1,0 +1,12 @@
+services:
+  tauonsongapi:
+    image: ghcr.io/happyareabean/tauonsongapi:latest
+    ports:
+      - "7000:7000"
+    environment:
+      TAUON_API_URL: "http://host.docker.internal:7814"
+      STATIC_FILES_PATH: "/app/html"
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # Needed on Linux; harmless on Docker Desktop
+    volumes:
+      - ./html:/app/html
