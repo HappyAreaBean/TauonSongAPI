@@ -2,6 +2,8 @@ name: Publish Shadow JAR and Docker image
 
 on:
   push:
+    branches:
+      - "**"
     tags:
       - "v*.*.*"
 
