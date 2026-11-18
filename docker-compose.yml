@@ -1,10 +1,11 @@
 services:
   tauonsongapi:
     image: ghcr.io/happyareabean/tauonsongapi:latest
+    #network_mode: host # Can try using host network mode if can't connect, and change TAUON_API_URL to localhost
     ports:
       - "7000:7000"
     environment:
-      TAUON_API_URL: "http://host.docker.internal:7814"
+      TAUON_API_URL: "host.docker.internal:7814"
       STATIC_FILES_PATH: "/app/html"
     extra_hosts:
       - "host.docker.internal:host-gateway" # Needed on Linux; harmless on Docker Desktop
