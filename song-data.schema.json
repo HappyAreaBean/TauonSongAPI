@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/HappyAreaBean/TauonSongAPI/song-data.schema.json",
+  "title": "SongData",
+  "description": "Current playback/track details returned by the API.",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "description": "Playback status, e.g. \"playing\" or \"stopped\"."
+    },
+    "artist": {
+      "type": "string",
+      "description": "Artist name(s), separated by ';' when multiple."
+    },
+    "title": {
+      "type": "string"
+    },
+    "album": {
+      "type": "string"
+    },
+    "albumArt": {
+      "type": "string",
+      "format": "uri-reference",
+      "description": "URL of the album art image."
+    },
+    "song": {
+      "type": ["string", "null"],
+      "description": "Song identifier; null when unavailable."
+    },
+    "progress": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Elapsed time in milliseconds."
+    },
+    "duration": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total track length in milliseconds."
+    }
+  },
+  "required": ["status", "artist", "title", "album", "albumArt", "song", "progress", "duration"],
+  "additionalProperties": false
+}
