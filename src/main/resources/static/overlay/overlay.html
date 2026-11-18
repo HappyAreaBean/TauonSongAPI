@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OBS Now Playing Overlay</title>
+  <script src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"></script>
+  <style>
+    :root {
+      /* === Layout & Sizing === */
+      --widget-width: 420px;
+      --widget-padding: 12px;
+      --widget-gap: 14px;
+      --art-size: 72px;
+      --radius: 14px;
+      --art-radius: 10px;
+
+      /* === Colors & Glass Effect === */
+      --bg-color: rgba(18, 18, 22, 0.88);
+      --backdrop-blur: 14px;
+      --border-width: 1px;
+      --border-color: rgba(255, 255, 255, 0.12);
+      --box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+
+      /* === Typography === */
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, "Noto Sans CJK TC", "Microsoft JhengHei", sans-serif;
+      --title-size: 16px;
+      --title-weight: 700;
+      --title-color: #ffffff;
+      --artist-size: 13.5px;
+      --artist-weight: 500;
+      --artist-color: rgba(255, 255, 255, 0.72);
+      --time-size: 11px;
+      --time-color: rgba(255, 255, 255, 0.65);
+
+      /* === Progress Bar === */
+      --progress-height: 5px;
+      --progress-bg: rgba(255, 255, 255, 0.18);
+      --default-accent: #1db954;
+      --accent-color: var(--default-accent);
+      --color-transition: 0.6s;
+
+      /* === Animations === */
+      --fade-duration: 0.45s;
+      --fade-offset-y: 12px;
+      --track-change-duration: 0.5s;
+      --marquee-min-duration: 7s;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: transparent;
+      font-family: var(--font-family);
+      overflow: hidden;
+      padding: 24px;
+    }
+
+    .widget {
+      display: flex;
+      align-items: center;
+      gap: var(--widget-gap);
+      width: var(--widget-width);
+      padding: var(--widget-padding);
+      background: var(--bg-color);
+      backdrop-filter: blur(var(--backdrop-blur));
+      -webkit-backdrop-filter: blur(var(--backdrop-blur));
+      border: var(--border-width) solid var(--border-color);
+      border-radius: var(--radius);
+      box-shadow: var(--box-shadow);
+
+      opacity: 0;
+      transform: translateY(var(--fade-offset-y)) scale(0.98);
+      pointer-events: none;
+      transition:
+        opacity var(--fade-duration) cubic-bezier(0.22, 1, 0.36, 1),
+        transform var(--fade-duration) cubic-bezier(0.22, 1, 0.36, 1),
+        clip-path var(--track-change-duration) cubic-bezier(0.22, 1, 0.36, 1),
+        border-color 0.4s ease;
+    }
+
+    .widget.visible {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    .art-wrapper {
+      position: relative;
+      z-index: 2;
+      width: var(--art-size);
+      height: var(--art-size);
+      flex-shrink: 0;
+      border-radius: var(--art-radius);
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .art-wrapper img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease;
+    }
+
+    .art-placeholder {
+      width: 44%;
+      height: 44%;
+      fill: rgba(255, 255, 255, 0.4);
+    }
+
+    .info {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition:
+        transform var(--track-change-duration) cubic-bezier(0.22, 1, 0.36, 1),
+        opacity calc(var(--track-change-duration) * 0.8) ease,
+        clip-path var(--track-change-duration) cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .marquee-box {
+      width: 100%;
+      overflow: hidden;
+      white-space: nowrap;
+      position: relative;
+      perspective: 420px;
+    }
+
+    .marquee-inner {
+      width: 100%;
+      transform-origin: center center;
+    }
+
+    .marquee-box.is-scrolling {
+      -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 5%, #000 95%, transparent 100%);
+      mask-image: linear-gradient(90deg, transparent 0%, #000 5%, #000 95%, transparent 100%);
+    }
+
+    .marquee-text {
+      display: inline-block;
+      white-space: nowrap;
+      will-change: transform;
+    }
+
+    .marquee-box.is-scrolling .marquee-text {
+      padding-left: 6px;
+      animation: scroll-bounce var(--scroll-duration, 10s) ease-in-out infinite;
+    }
+
+    @keyframes scroll-bounce {
+      0%, 18% { transform: translateX(0); }
+      50%, 68% { transform: translateX(var(--scroll-offset, 0px)); }
+      100% { transform: translateX(0); }
+    }
+
+    .title {
+      font-size: var(--title-size);
+      font-weight: var(--title-weight);
+      color: var(--title-color);
+      letter-spacing: -0.01em;
+    }
+
+    .artist {
+      font-size: var(--artist-size);
+      font-weight: var(--artist-weight);
+      color: var(--artist-color);
+    }
+
+    .gradient-text {
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent !important;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .progress-section {
+      margin-top: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: var(--progress-height);
+      background: var(--progress-bg);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent-color);
+      border-radius: 999px;
+      will-change: width;
+      transition: background-color var(--color-transition) ease;
+    }
+
+    .time-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: var(--time-size);
+      font-variant-numeric: tabular-nums;
+      color: var(--time-color);
+    }
+
+    /* =====================================================================
+       TRACK CHANGE ANIMATION PRESETS
+       ===================================================================== */
+
+    /* 1. Ribbon Unroll */
+    .widget.anim-unroll-card {
+      clip-path: inset(0 0% 0 0 round var(--radius));
+    }
+    .widget.anim-unroll-card.is-exiting {
+      clip-path: inset(0 100% 0 0 round var(--radius));
+    }
+
+    /* 2. Drawer Roll-Out */
+    .widget.anim-unroll-info .info {
+      clip-path: inset(0 0% 0 0);
+      transform: translateX(0);
+      opacity: 1;
+    }
+    .widget.anim-unroll-info.is-exiting .info {
+      clip-path: inset(0 100% 0 0);
+      transform: translateX(-28px);
+      opacity: 0;
+    }
+    .widget.anim-unroll-info.is-exiting .art-wrapper img {
+      transform: scale(0.92);
+    }
+
+    /* 3. Odometer / Vertical Slot Roll */
+    .widget.anim-roll-up.is-exiting .marquee-inner {
+      animation: roll-up-out 0.22s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+    }
+    .widget.anim-roll-up.is-entering .marquee-inner {
+      animation: roll-up-in 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .widget.anim-roll-up.is-entering #artistBox .marquee-inner {
+      animation-delay: 0.06s;
+    }
+    .widget.anim-roll-up.is-exiting .art-wrapper img {
+      transform: scale(0.86) rotate(-4deg);
+      opacity: 0;
+    }
+    .widget.anim-roll-up.is-entering .art-wrapper img {
+      animation: art-pop 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    @keyframes roll-up-out {
+      0%   { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-115%); }
+    }
+    @keyframes roll-up-in {
+      0%   { opacity: 0; transform: translateY(115%); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 4. 3D Cylinder / Split-Flap Roll */
+    .widget.anim-flip-3d.is-exiting .marquee-inner {
+      animation: flip-3d-out 0.22s ease-in forwards;
+    }
+    .widget.anim-flip-3d.is-entering .marquee-inner {
+      animation: flip-3d-in 0.36s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .widget.anim-flip-3d.is-entering #artistBox .marquee-inner {
+      animation-delay: 0.06s;
+    }
+    .widget.anim-flip-3d.is-exiting .art-wrapper img {
+      transform: rotateY(90deg) scale(0.9);
+      opacity: 0;
+    }
+    .widget.anim-flip-3d.is-entering .art-wrapper img {
+      animation: art-flip-in 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    @keyframes flip-3d-out {
+      0%   { opacity: 1; transform: rotateX(0deg) translateY(0); }
+      100% { opacity: 0; transform: rotateX(80deg) translateY(-40%); }
+    }
+    @keyframes flip-3d-in {
+      0%   { opacity: 0; transform: rotateX(-80deg) translateY(40%); }
+      100% { opacity: 1; transform: rotateX(0deg) translateY(0); }
+    }
+    @keyframes art-flip-in {
+      0%   { opacity: 0; transform: rotateY(-90deg) scale(0.9); }
+      100% { opacity: 1; transform: rotateY(0deg) scale(1); }
+    }
+
+    /* 5. Classic Subtle Pop */
+    .widget.anim-pop.is-entering {
+      animation: widget-pulse 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .widget.anim-pop.is-entering .marquee-inner {
+      animation: text-slide-up 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    .widget.anim-pop.is-entering #artistBox .marquee-inner {
+      animation-delay: 0.06s;
+    }
+    .widget.anim-pop.is-entering .art-wrapper img {
+      animation: art-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    @keyframes widget-pulse {
+      0%   { transform: scale(1); border-color: var(--border-color); }
+      35%  { transform: scale(1.015); border-color: rgba(255, 255, 255, 0.32); }
+      100% { transform: scale(1); border-color: var(--border-color); }
+    }
+    @keyframes text-slide-up {
+      0%   { opacity: 0; transform: translateY(8px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes art-pop {
+      0%   { opacity: 0; transform: scale(0.86); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+
+<div id="widget" class="widget">
+  <div class="art-wrapper">
+    <img id="albumArt" crossorigin="anonymous" alt="" style="display: none;" />
+    <svg id="artPlaceholder" class="art-placeholder" viewBox="0 0 24 24">
+      <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+    </svg>
+  </div>
+
+  <div class="info">
+    <div id="titleBox" class="marquee-box">
+      <div class="marquee-inner">
+        <span id="titleText" class="marquee-text title"></span>
+      </div>
+    </div>
+    <div id="artistBox" class="marquee-box">
+      <div class="marquee-inner">
+        <span id="artistText" class="marquee-text artist"></span>
+      </div>
+    </div>
+
+    <div id="progressSection" class="progress-section">
+      <div id="progressTrack" class="progress-track">
+        <div id="progressFill" class="progress-fill"></div>
+      </div>
+      <div id="timeRow" class="time-row">
+        <span id="elapsedTime">0:00</span>
+        <span id="totalTime">0:00</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const params = new URLSearchParams(window.location.search);
+
+  const legacyAnimFlag = params.get("animateTrackChange");
+  const defaultAnim = legacyAnimFlag === "false" ? "none" : "unroll-info";
+
+  const CONFIG = {
+    apiUrl: params.get("api") || "http://localhost:7000/get/status?format=json",
+    pollIntervalMs: Number(params.get("poll")) || 1000,
+    demoMode: params.get("demo") === "true",
+
+    // Visibility & Animation
+    showWhenPaused: params.get("showWhenPaused") === "true",
+    showProgressBar: params.get("showProgressBar") !== "false",
+    showTimestamps: params.get("showTime") !== "false",
+    trackAnimation: params.get("trackAnim") || defaultAnim,
+
+    // Custom Fonts (CSS font-family fallback list + optional Google Fonts loader)
+    fontFamily: params.get("font") || null,
+    googleFonts: params.get("googleFont") || null,
+
+    // Custom colors (hex, rgb/hsl, or CSS gradients)
+    titleColor: params.get("titleColor") || null,
+    artistColor: params.get("artistColor") || null,
+    progressColor: params.get("progressColor") || params.get("accent") || null,
+
+    // Dynamic album art color for progress bar
+    dynamicProgressColor: params.get("dynamicColor") !== "false",
+    minBarLightness: 50,
+    maxBarLightness: 74,
+
+    artistSeparator: params.get("separator") || ", ",
+  };
+
+  const rootEl = document.documentElement;
+  const widgetEl = document.getElementById("widget");
+  const albumArtEl = document.getElementById("albumArt");
+  const artPlaceholderEl = document.getElementById("artPlaceholder");
+  const titleBoxEl = document.getElementById("titleBox");
+  const titleTextEl = document.getElementById("titleText");
+  const artistBoxEl = document.getElementById("artistBox");
+  const artistTextEl = document.getElementById("artistText");
+  const progressSectionEl = document.getElementById("progressSection");
+  const progressTrackEl = document.getElementById("progressTrack");
+  const progressFillEl = document.getElementById("progressFill");
+  const timeRowEl = document.getElementById("timeRow");
+  const elapsedTimeEl = document.getElementById("elapsedTime");
+  const totalTimeEl = document.getElementById("totalTime");
+
+  if (CONFIG.trackAnimation && CONFIG.trackAnimation !== "none") {
+    widgetEl.classList.add(`anim-${CONFIG.trackAnimation}`);
+  }
+
+  // Optional Google Fonts injection (comma-separated family names, e.g. "Poppins, Noto Sans TC")
+  if (CONFIG.googleFonts) {
+    const families = CONFIG.googleFonts
+      .split(",")
+      .map((f) => f.trim().replace(/^["']|["']$/g, ""))
+      .filter(Boolean);
+
+    if (families.length > 0) {
+      const query = families
+        .map((name) => `family=${encodeURIComponent(name)}:wght@400;500;600;700`)
+        .join("&");
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = `https://fonts.googleapis.com/css2?${query}&display=swap`;
+      document.head.appendChild(link);
+    }
+  }
+
+  const CSS_VAR_PARAMS = {
+    width: "--widget-width",
+    padding: "--widget-padding",
+    artSize: "--art-size",
+    radius: "--radius",
+    artRadius: "--art-radius",
+    bgColor: "--bg-color",
+    blur: "--backdrop-blur",
+    borderColor: "--border-color",
+    shadow: "--box-shadow",
+    font: "--font-family",
+    titleSize: "--title-size",
+    artistSize: "--artist-size",
+    timeColor: "--time-color",
+    progressHeight: "--progress-height",
+    progressBg: "--progress-bg",
+    fadeDuration: "--fade-duration",
+    trackChangeDuration: "--track-change-duration",
+  };
+
+  for (const [paramKey, cssVar] of Object.entries(CSS_VAR_PARAMS)) {
+    if (params.has(paramKey) && params.get(paramKey) !== "") {
+      rootEl.style.setProperty(cssVar, params.get(paramKey));
+    }
+  }
+
+  function isCssGradient(value) {
+    return typeof value === "string" && /gradient\(/i.test(value.trim());
+  }
+
+  function applyTextPaint(el, cssVarName, value) {
+    if (!value) return;
+    if (isCssGradient(value)) {
+      el.style.backgroundImage = value;
+      el.classList.add("gradient-text");
+    } else {
+      el.classList.remove("gradient-text");
+      el.style.removeProperty("background-image");
+      rootEl.style.setProperty(cssVarName, value);
+    }
+  }
+
+  function applyFillPaint(el, cssVarName, value) {
+    if (!value) return;
+    if (isCssGradient(value)) {
+      el.style.background = value;
+    } else {
+      rootEl.style.setProperty(cssVarName, value);
+    }
+  }
+
+  if (!CONFIG.showProgressBar) progressTrackEl.style.display = "none";
+  if (!CONFIG.showTimestamps) timeRowEl.style.display = "none";
+  if (!CONFIG.showProgressBar && !CONFIG.showTimestamps) {
+    progressSectionEl.style.display = "none";
+  }
+
+  applyTextPaint(titleTextEl, "--title-color", CONFIG.titleColor);
+  applyTextPaint(artistTextEl, "--artist-color", CONFIG.artistColor);
+
+  if (CONFIG.progressColor) {
+    CONFIG.dynamicProgressColor = false;
+    applyFillPaint(progressFillEl, "--default-accent", CONFIG.progressColor);
+  }
+
+  let currentTrackKey = "";
+  let currentArtUrl = "";
+  let isPlaying = false;
+  let baseProgressMs = 0;
+  let durationMs = 0;
+  let lastSyncTimestamp = performance.now();
+  let switchTimeoutId = null;
+  let cleanupTimeoutId = null;
+
+  function formatTime(ms) {
+    if (!Number.isFinite(ms) || ms < 0) return "0:00";
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  }
+
+  function formatArtists(artistStr) {
+    if (!artistStr) return "";
+    return artistStr
+      .split(";")
+      .map((a) => a.trim())
+      .filter(Boolean)
+      .join(CONFIG.artistSeparator);
+  }
+
+  function toReadableHsl(swatch, minLightness, maxLightness) {
+    const [h, s, l] = swatch.hsl;
+    const hue = Math.round(h * 360);
+    const sat = Math.round(s * 100);
+    const light = Math.min(maxLightness, Math.max(minLightness, Math.round(l * 100)));
+    return `hsl(${hue}, ${sat}%, ${light}%)`;
+  }
+
+  async function extractAndApplyProgressColor(imgEl) {
+    if (!CONFIG.dynamicProgressColor || typeof Vibrant === "undefined") {
+      resetProgressColor();
+      return;
+    }
+
+    try {
+      const palette = await Vibrant.from(imgEl).quality(1).getPalette();
+      const barSwatch =
+        palette.Vibrant ||
+        palette.LightVibrant ||
+        palette.Muted ||
+        palette.LightMuted ||
+        palette.DarkVibrant;
+
+      if (!barSwatch) {
+        resetProgressColor();
+        return;
+      }
+
+      const barColor = toReadableHsl(barSwatch, CONFIG.minBarLightness, CONFIG.maxBarLightness);
+      rootEl.style.setProperty("--accent-color", barColor);
+    } catch (err) {
+      resetProgressColor();
+    }
+  }
+
+  function resetProgressColor() {
+    rootEl.style.removeProperty("--accent-color");
+  }
+
+  function updateMarquee(boxEl, textEl) {
+    boxEl.classList.remove("is-scrolling");
+    textEl.style.removeProperty("--scroll-offset");
+    textEl.style.removeProperty("--scroll-duration");
+
+    requestAnimationFrame(() => {
+      const overflow = textEl.scrollWidth - boxEl.clientWidth;
+      if (overflow > 4) {
+        const offset = -(overflow + 12);
+        const minSec = parseFloat(getComputedStyle(rootEl).getPropertyValue("--marquee-min-duration")) || 7;
+        const duration = Math.max(minSec, Math.round(overflow / 18) + 5);
+        textEl.style.setProperty("--scroll-offset", `${offset}px`);
+        textEl.style.setProperty("--scroll-duration", `${duration}s`);
+        boxEl.classList.add("is-scrolling");
+      }
+    });
+  }
+
+  // Re-check marquee width once custom / web fonts finish loading
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => {
+      updateMarquee(titleBoxEl, titleTextEl);
+      updateMarquee(artistBoxEl, artistTextEl);
+    });
+  }
+
+  function updateArtwork(url) {
+    if (url === currentArtUrl) return;
+    currentArtUrl = url || "";
+
+    if (!currentArtUrl) {
+      albumArtEl.style.display = "none";
+      artPlaceholderEl.style.display = "block";
+      resetProgressColor();
+      return;
+    }
+
+    albumArtEl.onload = () => {
+      albumArtEl.style.display = "block";
+      artPlaceholderEl.style.display = "none";
+      extractAndApplyProgressColor(albumArtEl);
+    };
+    albumArtEl.onerror = () => {
+      albumArtEl.style.display = "none";
+      artPlaceholderEl.style.display = "block";
+      resetProgressColor();
+    };
+    albumArtEl.src = currentArtUrl;
+  }
+
+  function renderTrackContent(title, artist, albumArt) {
+    titleTextEl.textContent = title;
+    artistTextEl.textContent = artist;
+    updateMarquee(titleBoxEl, titleTextEl);
+    updateMarquee(artistBoxEl, artistTextEl);
+    updateArtwork(albumArt);
+  }
+
+  function getExitDelayMs() {
+    switch (CONFIG.trackAnimation) {
+      case "unroll-card":
+      case "unroll-info":
+        return 340;
+      case "roll-up":
+      case "flip-3d":
+        return 210;
+      default:
+        return 0;
+    }
+  }
+
+  function setProgressDisplay(ms, total) {
+    if (total > 0) {
+      const clamped = Math.min(total, Math.max(0, ms));
+      const pct = Math.min(100, Math.max(0, (clamped / total) * 100));
+      progressFillEl.style.width = `${pct.toFixed(2)}%`;
+      elapsedTimeEl.textContent = formatTime(clamped);
+    } else {
+      progressFillEl.style.width = "0%";
+      elapsedTimeEl.textContent = "0:00";
+    }
+  }
+
+  function applySongData(data) {
+    const status = data && typeof data.status === "string" ? data.status.toLowerCase() : "";
+    const playing = status === "playing";
+    const paused = status === "paused";
+    const hasTrack = Boolean(data && (data.title || data.song));
+    const shouldShow = playing || (CONFIG.showWhenPaused && paused && hasTrack);
+
+    const wasVisible = widgetEl.classList.contains("visible");
+    isPlaying = playing;
+
+    if (!shouldShow) {
+      widgetEl.classList.remove("visible");
+      return;
+    }
+
+    const title = data.title || "Unknown Title";
+    const artist = formatArtists(data.artist) || "Unknown Artist";
+    const trackKey = `${data.song ?? ""}|${title}|${artist}`;
+    const isTrackSwitch =
+      currentTrackKey !== "" &&
+      trackKey !== currentTrackKey &&
+      wasVisible &&
+      CONFIG.trackAnimation !== "none";
+
+    if (trackKey !== currentTrackKey) {
+      currentTrackKey = trackKey;
+      clearTimeout(switchTimeoutId);
+      clearTimeout(cleanupTimeoutId);
+
+      if (isTrackSwitch) {
+        const exitDelay = getExitDelayMs();
+        widgetEl.classList.remove("is-entering");
+
+        if (exitDelay > 0) {
+          widgetEl.classList.add("is-exiting");
+        }
+
+        switchTimeoutId = setTimeout(() => {
+          renderTrackContent(title, artist, data.albumArt);
+          widgetEl.classList.remove("is-exiting");
+          void widgetEl.offsetWidth;
+          widgetEl.classList.add("is-entering");
+
+          cleanupTimeoutId = setTimeout(() => {
+            widgetEl.classList.remove("is-entering");
+          }, 550);
+        }, exitDelay);
+      } else {
+        renderTrackContent(title, artist, data.albumArt);
+      }
+    }
+
+    baseProgressMs = Math.max(0, Number(data.progress) || 0);
+    durationMs = Math.max(0, Number(data.duration) || 0);
+    lastSyncTimestamp = performance.now();
+
+    totalTimeEl.textContent = formatTime(durationMs);
+    setProgressDisplay(baseProgressMs, durationMs);
+    widgetEl.classList.add("visible");
+  }
+
+  function renderProgressLoop(now) {
+    if (isPlaying && durationMs > 0) {
+      const elapsed = Math.min(durationMs, baseProgressMs + (now - lastSyncTimestamp));
+      setProgressDisplay(elapsed, durationMs);
+    }
+    requestAnimationFrame(renderProgressLoop);
+  }
+
+  function makeDemoArt(c1, c2) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/></linearGradient></defs><rect width="200" height="200" fill="url(#g)"/><circle cx="100" cy="100" r="46" fill="rgba(255,255,255,0.2)"/></svg>`;
+    return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+  }
+
+  const DEMO_TRACKS = [
+    {
+      status: "playing",
+      title: "Midnight City Overdrive (Extended Mix)",
+      artist: "Synthwave Collective; Neon Drift",
+      album: "Afterhours",
+      albumArt: makeDemoArt("#ff007f", "#7928ca"),
+      song: "demo-1",
+      progress: 64000,
+      duration: 215000,
+    },
+    {
+      status: "playing",
+      title: "夜空中最亮的星 — Starlight Horizons",
+      artist: "逃跑計劃; Aetheris",
+      album: "Celestial",
+      albumArt: makeDemoArt("#00c6ff", "#0072ff"),
+      song: "demo-2",
+      progress: 42000,
+      duration: 188000,
+    },
+    {
+      status: "playing",
+      title: "Velvet Sunset Boulevard",
+      artist: "Kaito; Mellow Waves",
+      album: "Coastline",
+      albumArt: makeDemoArt("#f7971e", "#ffd200"),
+      song: "demo-3",
+      progress: 19000,
+      duration: 174000,
+    }
+  ];
+  let demoIndex = 0;
+  let demoPaused = false;
+
+  async function pollApi() {
+    if (CONFIG.demoMode) {
+      const track = DEMO_TRACKS[demoIndex];
+      applySongData({ ...track, status: demoPaused ? "paused" : "playing" });
+      return;
+    }
+
+    try {
+      const res = await fetch(CONFIG.apiUrl, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      applySongData(data);
+    } catch (err) {
+      isPlaying = false;
+      widgetEl.classList.remove("visible");
+    }
+  }
+
+  window.addEventListener("message", (e) => {
+    if (!CONFIG.demoMode) return;
+    if (e.data === "nextDemoTrack") {
+      demoPaused = false;
+      demoIndex = (demoIndex + 1) % DEMO_TRACKS.length;
+      pollApi();
+    } else if (e.data === "toggleDemoPause") {
+      demoPaused = !demoPaused;
+      pollApi();
+    }
+  });
+
+  requestAnimationFrame(renderProgressLoop);
+  pollApi();
+  setInterval(pollApi, CONFIG.pollIntervalMs);
+</script>
+</body>
+</html>

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.javalin.Javalin;
 import io.javalin.http.ContentType;
 import io.javalin.http.Context;
+import io.javalin.http.staticfiles.Location;
 import io.javalin.plugin.bundled.CorsPluginConfig;
 
 import java.io.IOException;
@@ -58,6 +59,12 @@ public class APIServer {
             config.routes.get("/get/{type}/{dataType}", apiServer::handleDownload);
 
             config.routes.get("/static/{fileName}", apiServer::handleStaticFileProxy);
+
+            config.staticFiles.add(staticFileConfig -> {
+                staticFileConfig.hostedPath = "/overlay";
+                staticFileConfig.directory = "static/overlay";
+                staticFileConfig.location = Location.CLASSPATH;
+            });
         }).start(APP_PORT);
     }
 

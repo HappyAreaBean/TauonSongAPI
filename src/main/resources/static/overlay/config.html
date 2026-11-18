@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OBS Now Playing — Configurator</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #171a21;
+      --border: #262b36;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #1db954;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      padding: 20px;
+      overflow-y: auto;
+      max-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    h1 { font-size: 18px; font-weight: 700; }
+    .subtitle { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+
+    .section {
+      border-top: 1px solid var(--border);
+      padding-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    label {
+      font-size: 12.5px;
+      font-weight: 500;
+      color: #cbd5e1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    select {
+      width: 100%;
+      background: #0d0f13;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 7px;
+      font-size: 12.5px;
+      outline: none;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--accent);
+    }
+
+    .color-input-group {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    input[type="color"] {
+      width: 34px;
+      height: 34px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: #0d0f13;
+      cursor: pointer;
+      padding: 2px;
+      flex-shrink: 0;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 0;
+    }
+
+    input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .main {
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .preview-card {
+      flex: 1;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 280px;
+    }
+
+    .preview-toolbar {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12.5px;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .preview-stage {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #181a20;
+      background-image:
+        linear-gradient(45deg, #20232b 25%, transparent 25%),
+        linear-gradient(-45deg, #20232b 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #20232b 75%),
+        linear-gradient(-45deg, transparent 75%, #20232b 75%);
+      background-size: 24px 24px;
+      background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+    }
+
+    iframe {
+      border: none;
+      width: 100%;
+      height: 220px;
+    }
+
+    .output-box {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .url-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .url-row input {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      color: #a7f3d0;
+    }
+
+    button {
+      background: var(--accent);
+      color: #052e16;
+      font-weight: 700;
+      font-size: 12.5px;
+      border: none;
+      border-radius: 7px;
+      padding: 8px 14px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.15s;
+    }
+
+    button:hover { opacity: 0.9; }
+    button.secondary {
+      background: #262b36;
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .hint {
+      font-size: 11.5px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div>
+    <h1>Overlay Configurator</h1>
+    <p class="subtitle">Customize your TauonSongAPI OBS widget</p>
+  </div>
+
+  <!-- API & Polling -->
+  <div class="section">
+    <div class="section-title">Connection</div>
+    <div class="field">
+      <label>API Endpoint URL</label>
+      <input type="text" id="api" value="http://localhost:7000/get/status?format=json" />
+    </div>
+    <div class="row-2">
+      <div class="field">
+        <label>Poll Interval (ms)</label>
+        <input type="number" id="poll" value="1000" min="200" step="100" />
+      </div>
+      <div class="field">
+        <label>Artist Separator</label>
+        <input type="text" id="separator" value=", " />
+      </div>
+    </div>
+  </div>
+
+  <!-- Visibility & Animation -->
+  <div class="section">
+    <div class="section-title">Behavior & Animation</div>
+    <div class="field">
+      <label>New Song Animation</label>
+      <select id="trackAnim">
+        <option value="unroll-info">Drawer Roll-Out (from album art)</option>
+        <option value="unroll-card">Ribbon Unroll (full card)</option>
+        <option value="roll-up">Odometer / Slot Roll (vertical)</option>
+        <option value="flip-3d">3D Cylinder Roll</option>
+        <option value="pop">Subtle Pop & Slide</option>
+        <option value="none">None (Instant Swap)</option>
+      </select>
+    </div>
+    <div class="toggle-row">
+      <label for="showWhenPaused">Show When Paused</label>
+      <input type="checkbox" id="showWhenPaused" />
+    </div>
+    <div class="toggle-row">
+      <label for="showProgressBar">Show Progress Bar</label>
+      <input type="checkbox" id="showProgressBar" checked />
+    </div>
+    <div class="toggle-row">
+      <label for="showTime">Show Timestamps</label>
+      <input type="checkbox" id="showTime" checked />
+    </div>
+    <div class="toggle-row">
+      <label for="dynamicColor">Auto-Color Bar from Album Art</label>
+      <input type="checkbox" id="dynamicColor" checked />
+    </div>
+  </div>
+
+  <!-- Typography & Custom Fonts -->
+  <div class="section">
+    <div class="section-title">Typography & Font Fallback</div>
+    <div class="field">
+      <label>Font Stack Preset</label>
+      <select id="fontPreset">
+        <option value='-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, "Noto Sans CJK TC", "Microsoft JhengHei", sans-serif'>System UI + Noto Sans CJK TC (Default)</option>
+        <option value='"Poppins", "Noto Sans CJK TC", "Noto Sans TC", sans-serif'>Poppins + Noto Sans TC (Modern CJK)</option>
+        <option value='"Space Grotesk", "Noto Sans CJK TC", "Noto Sans TC", sans-serif'>Space Grotesk + Noto Sans TC (Geometric)</option>
+        <option value='"JetBrains Mono", "Noto Sans CJK TC", monospace'>JetBrains Mono + Noto Sans CJK TC</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>CSS Font-Family Order (comma-separated)</label>
+      <input
+              type="text"
+              id="font"
+              value='-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, "Noto Sans CJK TC", "Microsoft JhengHei", sans-serif'
+      />
+      <span class="hint">Evaluated left-to-right per character; missing glyphs fall back to later fonts.</span>
+    </div>
+    <div class="field">
+      <label>Load Google Fonts (optional)</label>
+      <input type="text" id="googleFont" placeholder="e.g. Poppins, Noto Sans TC" />
+    </div>
+    <div class="row-2">
+      <div class="field">
+        <label>Title Size</label>
+        <input type="text" id="titleSize" value="16px" />
+      </div>
+      <div class="field">
+        <label>Artist Size</label>
+        <input type="text" id="artistSize" value="13.5px" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Colors & Gradients -->
+  <div class="section">
+    <div class="section-title">Text & Bar Colors (Hex or CSS Gradient)</div>
+
+    <div class="field">
+      <label>Title Text Color / Gradient</label>
+      <div class="color-input-group">
+        <input type="color" id="titleColorPicker" value="#ffffff" />
+        <input type="text" id="titleColor" placeholder="#ffffff or linear-gradient(...)" />
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Artist Text Color / Gradient</label>
+      <div class="color-input-group">
+        <input type="color" id="artistColorPicker" value="#b8b8c2" />
+        <input type="text" id="artistColor" placeholder="rgba(255,255,255,0.72) or gradient" />
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Progress Bar Color / Gradient</label>
+      <div class="color-input-group">
+        <input type="color" id="progressColorPicker" value="#1db954" />
+        <input type="text" id="progressColor" placeholder="Leave blank for album art color" />
+      </div>
+    </div>
+
+    <div class="row-2">
+      <div class="field">
+        <label>Card Background</label>
+        <input type="text" id="bgColor" value="rgba(18, 18, 22, 0.88)" />
+      </div>
+      <div class="field">
+        <label>Border Color</label>
+        <input type="text" id="borderColor" value="rgba(255, 255, 255, 0.12)" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Dimensions & Shadow -->
+  <div class="section">
+    <div class="section-title">Sizing & Shadow</div>
+    <div class="row-2">
+      <div class="field">
+        <label>Widget Width</label>
+        <input type="text" id="width" value="420px" />
+      </div>
+      <div class="field">
+        <label>Album Art Size</label>
+        <input type="text" id="artSize" value="72px" />
+      </div>
+    </div>
+    <div class="row-2">
+      <div class="field">
+        <label>Card Radius</label>
+        <input type="text" id="radius" value="14px" />
+      </div>
+      <div class="field">
+        <label>Backdrop Blur</label>
+        <input type="text" id="blur" value="14px" />
+      </div>
+    </div>
+    <div class="row-2">
+      <div class="field">
+        <label>Bar Height</label>
+        <input type="text" id="progressHeight" value="5px" />
+      </div>
+      <div class="field">
+        <label>Roll Speed</label>
+        <input type="text" id="trackChangeDuration" value="0.5s" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Box Shadow Preset</label>
+      <select id="shadowPreset">
+        <option value="0 10px 30px rgba(0, 0, 0, 0.45)">Default Soft Shadow</option>
+        <option value="0 4px 12px rgba(0, 0, 0, 0.7)">Tight Dark Shadow</option>
+        <option value="0 0 24px rgba(29, 185, 84, 0.35)">Subtle Green Glow</option>
+        <option value="none">None</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Box Shadow CSS</label>
+      <input type="text" id="shadow" value="0 10px 30px rgba(0, 0, 0, 0.45)" />
+    </div>
+  </div>
+
+  <button class="secondary" id="resetBtn" type="button">Reset All Defaults</button>
+</aside>
+
+<main class="main">
+  <div class="preview-card">
+    <div class="preview-toolbar">
+      <span><strong>Live Preview</strong> (Demo Mode)</span>
+      <div class="toolbar-actions">
+        <button class="secondary" id="testPauseBtn" type="button">Pause / Resume</button>
+        <button id="testSwitchBtn" type="button">Simulate New Song</button>
+      </div>
+    </div>
+    <div class="preview-stage">
+      <iframe id="previewFrame" src="overlay.html?demo=true"></iframe>
+    </div>
+  </div>
+
+  <div class="output-box">
+    <label>Generated OBS Browser Source URL</label>
+    <div class="url-row">
+      <input type="text" id="outputUrl" readonly />
+      <button id="copyBtn" type="button">Copy URL</button>
+    </div>
+    <p class="hint" id="obsSizeHint">
+      Recommended OBS Browser Source size: <strong>Width 470</strong> × <strong>Height 150</strong>.
+      Paste this URL into OBS (uncheck "Local file").
+    </p>
+  </div>
+</main>
+
+<script>
+  const DEFAULTS = {
+    api: "http://localhost:7000/get/status?format=json",
+    poll: "1000",
+    separator: ", ",
+    trackAnim: "unroll-info",
+    showWhenPaused: false,
+    showProgressBar: true,
+    showTime: true,
+    dynamicColor: true,
+    font: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, "Noto Sans CJK TC", "Microsoft JhengHei", sans-serif',
+    googleFont: "",
+    titleSize: "16px",
+    artistSize: "13.5px",
+    titleColor: "",
+    artistColor: "",
+    progressColor: "",
+    bgColor: "rgba(18, 18, 22, 0.88)",
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    width: "420px",
+    artSize: "72px",
+    radius: "14px",
+    blur: "14px",
+    progressHeight: "5px",
+    trackChangeDuration: "0.5s",
+    shadow: "0 10px 30px rgba(0, 0, 0, 0.45)",
+  };
+
+  const previewFrame = document.getElementById("previewFrame");
+  const outputUrlEl = document.getElementById("outputUrl");
+  const copyBtn = document.getElementById("copyBtn");
+  const obsSizeHint = document.getElementById("obsSizeHint");
+
+  [
+    ["titleColorPicker", "titleColor"],
+    ["artistColorPicker", "artistColor"],
+    ["progressColorPicker", "progressColor"],
+  ].forEach(([pickerId, textId]) => {
+    const picker = document.getElementById(pickerId);
+    const text = document.getElementById(textId);
+    picker.addEventListener("input", () => {
+      text.value = picker.value;
+      if (textId === "progressColor") {
+        document.getElementById("dynamicColor").checked = false;
+      }
+      updateConfig();
+    });
+  });
+
+  document.getElementById("shadowPreset").addEventListener("change", (e) => {
+    document.getElementById("shadow").value = e.target.value;
+    updateConfig();
+  });
+
+  document.getElementById("fontPreset").addEventListener("change", (e) => {
+    const stack = e.target.value;
+    document.getElementById("font").value = stack;
+    // Auto-populate Google Fonts if a web font preset is chosen
+    if (stack.includes("Poppins")) {
+      document.getElementById("googleFont").value = "Poppins, Noto Sans TC";
+    } else if (stack.includes("Space Grotesk")) {
+      document.getElementById("googleFont").value = "Space Grotesk, Noto Sans TC";
+    } else if (stack.includes("JetBrains Mono")) {
+      document.getElementById("googleFont").value = "JetBrains Mono";
+    } else {
+      document.getElementById("googleFont").value = "";
+    }
+    updateConfig();
+  });
+
+  function buildQueryParams(includeDemo) {
+    const params = new URLSearchParams();
+    if (includeDemo) params.set("demo", "true");
+
+    for (const [key, defaultVal] of Object.entries(DEFAULTS)) {
+      const el = document.getElementById(key);
+      if (!el) continue;
+
+      if (el.type === "checkbox") {
+        if (el.checked !== defaultVal) {
+          params.set(key, String(el.checked));
+        }
+      } else {
+        const val = el.value;
+        if (val !== "" && val !== defaultVal) {
+          params.set(key, val);
+        }
+      }
+    }
+    return params.toString();
+  }
+
+  function updateConfig() {
+    const baseOverlayUrl = new URL("overlay.html", window.location.href).href;
+
+    const obsQuery = buildQueryParams(false);
+    outputUrlEl.value = obsQuery ? `${baseOverlayUrl}?${obsQuery}` : baseOverlayUrl;
+
+    const demoQuery = buildQueryParams(true);
+    previewFrame.src = `${baseOverlayUrl}?${demoQuery}`;
+
+    const numericWidth = parseInt(document.getElementById("width").value, 10) || 420;
+    obsSizeHint.innerHTML = `Recommended OBS Browser Source size: <strong>Width ${numericWidth + 50}</strong> × <strong>Height 150</strong>. Paste this URL into OBS (uncheck "Local file").`;
+  }
+
+  document.querySelectorAll(".sidebar input, .sidebar select").forEach((el) => {
+    if (el.type === "color" || el.id === "shadowPreset" || el.id === "fontPreset") return;
+    el.addEventListener("input", updateConfig);
+    el.addEventListener("change", updateConfig);
+  });
+
+  document.getElementById("testSwitchBtn").addEventListener("click", () => {
+    previewFrame.contentWindow?.postMessage("nextDemoTrack", "*");
+  });
+
+  document.getElementById("testPauseBtn").addEventListener("click", () => {
+    previewFrame.contentWindow?.postMessage("toggleDemoPause", "*");
+  });
+
+  copyBtn.addEventListener("click", async () => {
+    await navigator.clipboard.writeText(outputUrlEl.value);
+    copyBtn.textContent = "Copied!";
+    setTimeout(() => (copyBtn.textContent = "Copy URL"), 1500);
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    for (const [key, defaultVal] of Object.entries(DEFAULTS)) {
+      const el = document.getElementById(key);
+      if (!el) continue;
+      if (el.type === "checkbox") el.checked = defaultVal;
+      else el.value = defaultVal;
+    }
+    document.getElementById("fontPreset").selectedIndex = 0;
+    document.getElementById("shadowPreset").selectedIndex = 0;
+    updateConfig();
+  });
+
+  updateConfig();
+</script>
+</body>
+</html>
