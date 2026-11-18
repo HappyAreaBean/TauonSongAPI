@@ -6,15 +6,17 @@ TauonSongAPI is a Javalin application outputting track info by using Tauon's rem
 
 1. JDK 21+
 
-The docker usage is not ready yet, unless you figured out how to read Tauon API in your machine 🤷
-
-please let me know if you figured that out.
-
 # Usage
 
 1. Download the latest jar in [releases](https://github.com/HappyAreaBean/TauonSongAPI/releases)
 2. Set up the required environment (See below)
 3. Launch it: `java -jar TauonSongAPI.jar`
+
+## Docker
+
+1. Download or copy `docker-compose.yml`
+2. `docker compose up -d`
+3. That's it! You should be able to access `http://localhost:7000`, unless you changed the port. ;)
 
 # Environment & Configuration
 
