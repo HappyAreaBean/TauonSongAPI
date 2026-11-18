@@ -7,6 +7,7 @@ import io.javalin.http.ContentType;
 import io.javalin.http.Context;
 import io.javalin.http.staticfiles.Location;
 import io.javalin.plugin.bundled.CorsPluginConfig;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.net.URI;
@@ -19,6 +20,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 public class APIServer {
     
     private static final List<String> VALID_GET = Arrays.asList(
@@ -43,6 +45,11 @@ public class APIServer {
 
         var portEnv = System.getenv("APP_PORT");
         int APP_PORT = portEnv == null ? 7000 : Integer.parseInt(portEnv);
+
+        log.info("TAUON_API_URL: {}", hostName);
+        log.info("APP_URL: {}", APP_URL);
+        log.info("STATIC_FILES_PATH: {}", STATIC_FILES_PATH);
+        log.info("APP_PORT: {}", APP_PORT);
 
         var apiServer = new APIServer();
 
@@ -255,6 +262,7 @@ public class APIServer {
                 }
             }
         } catch (Exception e) {
+            log.error("Error when try to process request: {}", req, e);
             ctx.status(404).json(Map.of("error", true, "message", "Internal server error: " + e.getClass().getName() + " - " + e.getMessage()));
         }
     }
