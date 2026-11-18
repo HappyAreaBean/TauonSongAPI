@@ -125,6 +125,8 @@ public class APIServer {
                     String artist = root.getArtist();
                     String title = root.getTitle();
                     String album = root.getAlbum();
+                    int progress = root.getProgress();
+                    int duration = root.getTrack().getDuration();
 
                     String plain = songText(root);
 
@@ -135,7 +137,7 @@ public class APIServer {
 
                         switch (format) {
                             case "json" -> {
-                                ctx.status(200).json(new GSASongData(status, artist, title, album, albumArtUrl, null));
+                                ctx.status(200).json(new GSASongData(status, artist, title, album, albumArtUrl, null, progress, duration));
                             }
                             case "plain" -> {
                                 if (plain == null)

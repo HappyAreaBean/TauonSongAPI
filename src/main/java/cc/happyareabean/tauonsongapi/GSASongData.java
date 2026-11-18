@@ -15,4 +15,6 @@ public class GSASongData {
     private String album;
     private String albumArt;
     private String song;
+    private int progress;
+    private int duration;
 }
